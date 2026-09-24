@@ -16,6 +16,12 @@ output "record_ids" {
   value = { for k, r in cloudflare_dns_record.app : k => r.id }
 }
 
+# The public half only.  The secret stays in the state and the bundle, never in
+# an output, so nothing prints it.
+output "turnstile_sitekey" {
+  value = cloudflare_turnstile_widget.forms.sitekey
+}
+
 output "asset_bucket_name" {
   value = cloudflare_r2_bucket.assets.name
 }

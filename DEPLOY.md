@@ -34,6 +34,8 @@ running app holds no R2 credentials; only the upload side does.
      - **`Zone: Workers Routes: Edit`** — binds the asset Worker to URL patterns (routes are zone-scoped, separate from the script).
      - **`Account: Workers Scripts: Edit`** — uploads the asset Worker.
      - **`Account: Workers R2 Storage: Edit`** — creates/manages the R2 bucket.
+     - **`Zone: Zone WAF: Edit`** — the custom rule that challenges crawlers on the print routes (`cloudflare_ruleset.firewall_custom`).
+     - **`Account: Turnstile: Read`** — the plan reads the Turnstile widget. Without this permission, every plan fails with a 403. Change it to Edit only when an apply must change the widget.
 
      Note the split: the *script* and *bucket* are Account-scoped, but the *routes* are Zone-scoped. Missing the routes permission surfaces as a `403 Authentication error` on `workers/routes` only — the bucket and script create fine.
 4. **Cloudflare Origin CA cert** — in Cloudflare dashboard → SSL/TLS → Origin Server → Create Certificate; save the cert and private key. **Include a wildcard hostname** (`*.<domain>` alongside `<domain>`) so the single cert covers both `app.` and `www.`. The default Origin CA form pre-fills `<domain>, *.<domain>` — keep it.
