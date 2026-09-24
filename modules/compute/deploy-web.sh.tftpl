@@ -30,6 +30,15 @@ docker run -d \
   -v staticfiles:/app/staticfiles \
   "$IMAGE"
 
+# Clear the nginx page cache, because the new image can render the read pages
+# differently.  Nothing checks a cached page against the app, so without this
+# the old markup stays for up to 7 days.  The restart makes nginx rebuild its
+# cache index from the empty directory, so its size count stays correct.
+# The old web container is already gone, so no old page can refill the cache.
+# On the first boot nginx does not exist yet, which is why a failure is ignored.
+docker exec codechroniclenet-nginx find /var/cache/nginx/pages -mindepth 1 -delete 2>/dev/null || true
+docker restart codechroniclenet-nginx >/dev/null 2>&1 || true
+
 # Every deploy pulls a new SHA-tagged image, so no tag is ever reused and
 # nothing is ever implicitly replaced.  Without this the disk fills: 38 images
 # at ~720 MB reached 99% of a 26 GB disk in six weeks, and the pull that

@@ -63,6 +63,22 @@ http {
     upstream django_app {
         server 127.0.0.1:8000;
     }
+
+    # The page cache.  A crawler asks for the same read page again days later,
+    # after the one-hour edge copy has gone, and each request woke the Neon
+    # compute.  A hit here runs no Django and reads no row.
+    #
+    # The app decides what is kept and for how long: it sends X-Accel-Expires
+    # only on an anonymous 200 from a read page (web/http_cache.py in the app).
+    # proxy_ignore_headers below makes that header the only signal, and with
+    # no proxy_cache_valid nothing else is kept.  nginx also keeps nothing that
+    # carries Set-Cookie.  deploy-web.sh clears the cache on every deploy.
+    #
+    # inactive is longer than the app's 7 days, so an entry expires by its own
+    # time and not by disuse.  max_size is far above the ~400 MB the whole
+    # free-tier corpus needs.
+    proxy_cache_path /var/cache/nginx/pages levels=1:2 keys_zone=pages:10m
+                     max_size=1g inactive=8d use_temp_path=off;
     server {
         listen 80;
         server_name _;
@@ -86,6 +102,23 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto https;
             proxy_redirect off;
+
+            proxy_cache pages;
+            # The host is in the key: a page names its own origin in the
+            # canonical link, and www, app and the apex all serve it.
+            proxy_cache_key "$scheme$host$request_uri";
+            proxy_ignore_headers Cache-Control Expires;
+            # A session cookie means a reader the tier gate may treat
+            # differently.  Never answer that request from the cache, and
+            # never keep its answer.  The edge cache rule uses the same test.
+            proxy_cache_bypass $cookie_sessionid;
+            proxy_no_cache $cookie_sessionid;
+            # Two bots asking for one new page at once cost one render.
+            proxy_cache_lock on;
+            # If Django or Neon fails, an expired copy is better than an error.
+            proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
+            # HIT, MISS, BYPASS or nothing: shows in curl -I and in the log.
+            add_header X-Page-Cache $upstream_cache_status always;
         }
     }
 }
