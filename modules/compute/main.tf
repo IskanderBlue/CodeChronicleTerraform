@@ -41,7 +41,7 @@ resource "google_compute_instance" "app" {
 
   boot_disk {
     initialize_params {
-      image = "projects/cos-cloud/global/images/family/cos-stable"
+      image = var.boot_image
       size  = 30
     }
   }
