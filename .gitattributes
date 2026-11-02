@@ -1,0 +1,6 @@
+# Files that Terraform sends to the VM or to Cloudflare must keep LF line ends.
+# With core.autocrlf=true, git writes CRLF on Windows, and bash on the VM then
+# fails with "/bin/bash^M: bad interpreter".
+*.sh    text eol=lf
+*.tftpl text eol=lf
+*.js    text eol=lf
