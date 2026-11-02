@@ -5,6 +5,25 @@ set -euo pipefail
 iptables -C INPUT -p tcp --dport 22 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 22 -j ACCEPT
 iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
 
+# Drop TCP packets that carry IP options, before the TCP stack sees them.
+# CVE-2026-98432 is reached through the IP options of a TCP handshake, and no
+# normal client sends IP options.  The fixed kernel (see boot_image) is the
+# real fix; this rule is the second defence.  The u32 test reads the IPv4
+# header length: more than 5 words means the packet has options.  Dropped
+# packets are logged with the prefix "ipopts-drop: " (journalctl -k).
+#
+# Not fatal: this script runs with set -e, and a missing iptables module must
+# not stop the app from starting.
+IPOPTS_MATCH=(-p tcp -m u32 --u32 "0>>24&0xF=6:15")
+add_raw_rule() {
+  iptables -t raw -C PREROUTING "$@" 2>/dev/null || iptables -t raw -I PREROUTING 1 "$@"
+}
+# DROP first, then LOG at position 1, so LOG sits above DROP.
+if ! { add_raw_rule "$${IPOPTS_MATCH[@]}" -j DROP &&
+  add_raw_rule "$${IPOPTS_MATCH[@]}" -m limit --limit 6/min -j LOG --log-prefix "ipopts-drop: "; }; then
+  echo "WARNING: could not add the IP-options drop rule" >&2
+fi
+
 systemctl start docker
 
 METADATA="http://metadata.google.internal/computeMetadata/v1"
